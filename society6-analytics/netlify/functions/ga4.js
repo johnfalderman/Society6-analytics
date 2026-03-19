@@ -11,13 +11,42 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: "" };
   }
 
+  // Debug: check which env vars are present (not their values)
+  const envCheck = {
+    GA_PROJECT_ID: !!process.env.GA_PROJECT_ID,
+    GA_PRIVATE_KEY_ID: !!process.env.GA_PRIVATE_KEY_ID,
+    GA_PRIVATE_KEY: !!process.env.GA_PRIVATE_KEY,
+    GA_CLIENT_EMAIL: !!process.env.GA_CLIENT_EMAIL,
+    GA_CLIENT_ID: !!process.env.GA_CLIENT_ID,
+    GA_PROPERTY_ID: !!process.env.GA_PROPERTY_ID,
+  };
+
+  const missingVars = Object.entries(envCheck)
+    .filter(([, present]) => !present)
+    .map(([key]) => key);
+
+  if (missingVars.length > 0) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({
+        error: `Missing environment variables: ${missingVars.join(", ")}`,
+        envCheck,
+      }),
+    };
+  }
+
   try {
-    // Build credentials from environment variables
+    const rawKey = process.env.GA_PRIVATE_KEY;
+    const privateKey = rawKey.includes("\\n")
+      ? rawKey.replace(/\\n/g, "\n")
+      : rawKey;
+
     const credentials = {
       type: "service_account",
       project_id: process.env.GA_PROJECT_ID,
       private_key_id: process.env.GA_PRIVATE_KEY_ID,
-      private_key: process.env.GA_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      private_key: privateKey,
       client_email: process.env.GA_CLIENT_EMAIL,
       client_id: process.env.GA_CLIENT_ID,
       auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -40,7 +69,6 @@ exports.handler = async (event) => {
     let payload;
 
     if (report === "overview") {
-      // KPI summary — current + previous period for delta
       const days = body.days || 30;
       payload = {
         dateRanges: [
@@ -93,9 +121,9 @@ exports.handler = async (event) => {
       };
     } else {
       return {
-        statusCode: 400,
+        statusCode: 200,
         headers,
-        body: JSON.stringify({ error: "Unknown report type" }),
+        body: JSON.stringify({ status: "ok", envCheck }),
       };
     }
 
@@ -117,7 +145,10 @@ exports.handler = async (event) => {
       return {
         statusCode: response.status,
         headers,
-        body: JSON.stringify({ error: data.error?.message || "GA4 API error", details: data }),
+        body: JSON.stringify({
+          error: data.error?.message || "GA4 API error",
+          details: data,
+        }),
       };
     }
 
@@ -126,7 +157,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err.message }),
+      body: JSON.stringify({ error: err.message, stack: err.stack }),
     };
   }
 };
