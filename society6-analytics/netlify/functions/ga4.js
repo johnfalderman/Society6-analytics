@@ -11,36 +11,29 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: "" };
   }
 
-  // Debug: check which env vars are present (not their values)
-  const envCheck = {
-    GA_PROJECT_ID: !!process.env.GA_PROJECT_ID,
-    GA_PRIVATE_KEY_ID: !!process.env.GA_PRIVATE_KEY_ID,
-    GA_PRIVATE_KEY: !!process.env.GA_PRIVATE_KEY,
-    GA_CLIENT_EMAIL: !!process.env.GA_CLIENT_EMAIL,
-    GA_CLIENT_ID: !!process.env.GA_CLIENT_ID,
-    GA_PROPERTY_ID: !!process.env.GA_PROPERTY_ID,
-  };
-
-  const missingVars = Object.entries(envCheck)
-    .filter(([, present]) => !present)
-    .map(([key]) => key);
-
-  if (missingVars.length > 0) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: `Missing environment variables: ${missingVars.join(", ")}`,
-        envCheck,
-      }),
-    };
-  }
-
   try {
-    const rawKey = process.env.GA_PRIVATE_KEY;
-    const privateKey = rawKey.includes("\\n")
-      ? rawKey.replace(/\\n/g, "\n")
-      : rawKey;
+    // Robustly clean the private key regardless of how it was pasted
+    let privateKey = process.env.GA_PRIVATE_KEY || "";
+
+    // Remove any surrounding quotes that may have been accidentally included
+    privateKey = privateKey.replace(/^["']|["']$/g, "");
+
+    // Normalize line endings — handle both \\n (escaped) and literal \n
+    privateKey = privateKey.replace(/\\n/g, "\n");
+
+    // If the key is still one long line, insert newlines at the right spots
+    if (!privateKey.includes("\n")) {
+      privateKey = privateKey
+        .replace("-----BEGIN PRIVATE KEY-----", "-----BEGIN PRIVATE KEY-----\n")
+        .replace("-----END PRIVATE KEY-----", "\n-----END PRIVATE KEY-----");
+      // Split the base64 body into 64-char lines
+      const match = privateKey.match(/-----BEGIN PRIVATE KEY-----\n([\s\S]+?)\n-----END PRIVATE KEY-----/);
+      if (match) {
+        const body = match[1].replace(/\s/g, "");
+        const lines = body.match(/.{1,64}/g).join("\n");
+        privateKey = `-----BEGIN PRIVATE KEY-----\n${lines}\n-----END PRIVATE KEY-----\n`;
+      }
+    }
 
     const credentials = {
       type: "service_account",
@@ -123,7 +116,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ status: "ok", envCheck }),
+        body: JSON.stringify({ status: "ok", keyPreview: privateKey.slice(0, 60) }),
       };
     }
 
@@ -157,7 +150,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: err.message, stack: err.stack }),
+      body: JSON.stringify({ error: err.message }),
     };
   }
 };
