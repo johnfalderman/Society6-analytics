@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Society6 — Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0c0c0c;
+    --surface: #161616;
+    --surface2: #1e1e1e;
+    --border: #282828;
+    --accent: #e2ff5d;
+    --accent2: #5dffe2;
+    --text: #efefef;
+    --muted: #777;
+    --red: #ff6060;
+    --green: #60ff9a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    padding: 28px 32px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .brand-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .brand-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .range-tabs {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .range-tab {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+
+  .range-tab.active {
+    background: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .range-tab:hover:not(.active) { color: var(--text); }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .status-badge:hover { border-color: var(--accent); }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .dot.loading {
+    background: var(--accent);
+    animation: blink 0.8s infinite;
+  }
+
+  .dot.error { background: var(--red); animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* KPI Row */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    transition: border-color 0.2s;
+  }
+
+  .kpi:hover { border-color: #383838; }
+
+  .kpi-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .kpi-val {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 5px;
+    line-height: 1;
+  }
+
+  .kpi-delta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+  }
+
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--muted); }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, #262626 50%, var(--surface2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 3px;
+    display: block;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Charts */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .chart-wrap { position: relative; height: 190px; }
+
+  /* Tables */
+  .tables-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+
+  th {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  th.r { text-align: right; }
+
+  td {
+    padding: 8px 0;
+    font-size: 12.5px;
+    border-bottom: 1px solid #1c1c1c;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .td-r {
+    text-align: right;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  .page-path {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .channel-name { font-weight: 500; }
+
+  .bar-wrap {
+    width: 60px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  .error-banner {
+    background: rgba(255,96,96,0.07);
+    border: 1px solid rgba(255,96,96,0.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    color: var(--red);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .footer {
+    margin-top: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: #444;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-name">Society6</span>
+    <span class="brand-sub">GA4 · Live Analytics</span>
+  </div>
+  <div class="header-controls">
+    <div class="range-tabs">
+      <button class="range-tab" onclick="setRange(7, this)">7D</button>
+      <button class="range-tab active" onclick="setRange(30, this)">30D</button>
+      <button class="range-tab" onclick="setRange(90, this)">90D</button>
+    </div>
+    <div class="status-badge" onclick="loadAll()">
+      <div class="dot" id="dot"></div>
+      <span id="status-text">Refresh</span>
+    </div>
+  </div>
+</header>
+
+<div class="error-banner" id="error-banner"></div>
+
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-label">Sessions</div>
+    <div class="kpi-val" id="v-sessions"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-sessions">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Active Users</div>
+    <div class="kpi-val" id="v-users"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-users">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Conversions</div>
+    <div class="kpi-val" id="v-conv"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-conv">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Revenue</div>
+    <div class="kpi-val" id="v-rev"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-rev">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Bounce Rate</div>
+    <div class="kpi-val" id="v-bounce"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-bounce">—</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Avg. Session</div>
+    <div class="kpi-val" id="v-dur"><span class="skeleton" style="width:70px;height:22px">&nbsp;</span></div>
+    <div class="kpi-delta flat" id="d-dur">—</div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Sessions &amp; Users Over Time</div>
+    </div>
+    <div class="chart-wrap"><canvas id="timeChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Sessions by Channel</div>
+    </div>
+    <div class="chart-wrap"><canvas id="channelChart"></canvas></div>
+  </div>
+</div>
+
+<div class="tables-row">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Top Pages</div></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Page</th>
+          <th class="r">Sessions</th>
+          <th class="r">Bounce</th>
+        </tr>
+      </thead>
+      <tbody id="pages-body">
+        <tr><td colspan="3"><span class="skeleton" style="width:100%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+        <tr><td colspan="3"><span class="skeleton" style="width:80%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+        <tr><td colspan="3"><span class="skeleton" style="width:90%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Acquisition Channels</div></div>
+    <table>
+      <thead>
+        <tr>
+          <th>Channel</th>
+          <th class="r">Users</th>
+          <th class="r">Conv.</th>
+          <th class="r">Revenue</th>
+        </tr>
+      </thead>
+      <tbody id="channels-body">
+        <tr><td colspan="4"><span class="skeleton" style="width:100%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+        <tr><td colspan="4"><span class="skeleton" style="width:80%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+        <tr><td colspan="4"><span class="skeleton" style="width:90%;height:13px;display:block;margin:6px 0">&nbsp;</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer" id="footer"></div>
+
+<script>
+let currentDays = 30;
+let timeChart, channelChart;
+
+const API = '/.netlify/functions/ga4';
+
+function fmt(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return Math.round(n).toLocaleString();
+}
+
+function fmtRev(n) {
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(2) + 'M';
+  if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function fmtDur(secs) {
+  const m = Math.floor(secs / 60);
+  const s = Math.round(secs % 60);
+  return `${m}m ${s}s`;
+}
+
+function delta(cur, prev) {
+  if (!prev || prev === 0) return { text: '—', cls: 'flat' };
+  const pct = ((cur - prev) / prev * 100);
+  const sign = pct >= 0 ? '+' : '';
+  const cls = pct > 2 ? 'up' : pct < -2 ? 'down' : 'flat';
+  return { text: `${sign}${pct.toFixed(1)}% vs prior period`, cls };
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'dot ' + (state === 'loading' ? 'loading' : state === 'error' ? 'error' : '');
+  txt.textContent = state === 'loading' ? 'Loading…' : 'Refresh';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  el.style.display = 'block';
+  el.textContent = '⚠ ' + msg;
+}
+
+function hideError() {
+  document.getElementById('error-banner').style.display = 'none';
+}
+
+async function ga4(report, days) {
+  const r = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ report, days })
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'API error');
+  return data;
+}
+
+async function loadOverview(days) {
+  const data = await ga4('overview', days);
+  const rows = data.rows?.[0]?.metricValues || [];
+  const prev = data.rows?.[1]?.metricValues || [];
+
+  const metrics = [
+    { id: 'sessions', val: rows[0]?.value, pval: prev[0]?.value, fmt: fmt },
+    { id: 'users',    val: rows[1]?.value, pval: prev[1]?.value, fmt: fmt },
+    { id: 'conv',     val: rows[2]?.value, pval: prev[2]?.value, fmt: fmt },
+    { id: 'rev',      val: rows[3]?.value, pval: prev[3]?.value, fmt: fmtRev },
+    { id: 'bounce',   val: rows[4]?.value, pval: prev[4]?.value, fmt: v => (parseFloat(v)*100).toFixed(1)+'%' },
+    { id: 'dur',      val: rows[5]?.value, pval: prev[5]?.value, fmt: v => fmtDur(parseFloat(v)) },
+  ];
+
+  metrics.forEach(m => {
+    const v = parseFloat(m.val || 0);
+    const p = parseFloat(m.pval || 0);
+    document.getElementById('v-' + m.id).textContent = m.fmt(v);
+    const d = delta(v, p);
+    const del = document.getElementById('d-' + m.id);
+    del.textContent = d.text;
+    del.className = 'kpi-delta ' + d.cls;
+  });
+}
+
+async function loadTimeseries(days) {
+  const data = await ga4('timeseries', days);
+  const rows = data.rows || [];
+
+  const labels = rows.map(r => {
+    const d = r.dimensionValues[0].value;
+    return `${d.slice(4,6)}/${d.slice(6,8)}`;
+  });
+  const sessions = rows.map(r => parseInt(r.metricValues[0].value));
+  const users = rows.map(r => parseInt(r.metricValues[1].value));
+
+  if (timeChart) timeChart.destroy();
+  const ctx = document.getElementById('timeChart').getContext('2d');
+  timeChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Sessions',
+          data: sessions,
+          borderColor: '#e2ff5d',
+          backgroundColor: 'rgba(226,255,93,0.06)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: true,
+        },
+        {
+          label: 'Users',
+          data: users,
+          borderColor: '#5dffe2',
+          backgroundColor: 'rgba(93,255,226,0.04)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.4,
+          fill: true,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: {
+          labels: { color: '#777', font: { family: 'DM Mono', size: 10 }, boxWidth: 10 }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 8 },
+          grid: { color: '#1e1e1e' }
+        },
+        y: {
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, callback: v => fmt(v) },
+          grid: { color: '#1e1e1e' }
+        }
+      }
+    }
+  });
+}
+
+async function loadChannels(days) {
+  const data = await ga4('channels', days);
+  const rows = data.rows || [];
+
+  const labels = rows.map(r => r.dimensionValues[0].value);
+  const sessions = rows.map(r => parseInt(r.metricValues[0].value));
+  const total = sessions.reduce((a, b) => a + b, 0);
+
+  const colors = ['#e2ff5d','#5dffe2','#ff6060','#a78bfa','#fb923c','#38bdf8','#f472b6','#4ade80'];
+
+  if (channelChart) channelChart.destroy();
+  const ctx = document.getElementById('channelChart').getContext('2d');
+  channelChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: sessions,
+        backgroundColor: colors.slice(0, rows.length),
+        borderColor: '#0c0c0c',
+        borderWidth: 2,
+        hoverOffset: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#888',
+            font: { family: 'DM Mono', size: 9 },
+            boxWidth: 8,
+            padding: 10,
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${fmt(ctx.raw)} (${(ctx.raw/total*100).toFixed(1)}%)`
+          }
+        }
+      }
+    }
+  });
+
+  // Also fill channels table
+  const tbody = document.getElementById('channels-body');
+  tbody.innerHTML = rows.map(r => {
+    const ch = r.dimensionValues[0].value;
+    const users = parseInt(r.metricValues[1].value);
+    const conv = parseInt(r.metricValues[2].value);
+    const rev = parseFloat(r.metricValues[3].value);
+    return `<tr>
+      <td class="channel-name">${ch}</td>
+      <td class="td-r">${fmt(users)}</td>
+      <td class="td-r">${fmt(conv)}</td>
+      <td class="td-r">${fmtRev(rev)}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadPages(days) {
+  const data = await ga4('pages', days);
+  const rows = data.rows || [];
+  const maxSessions = Math.max(...rows.map(r => parseInt(r.metricValues[0].value)));
+
+  const tbody = document.getElementById('pages-body');
+  tbody.innerHTML = rows.map(r => {
+    const path = r.dimensionValues[0].value;
+    const sess = parseInt(r.metricValues[0].value);
+    const bounce = (parseFloat(r.metricValues[2].value) * 100).toFixed(0);
+    const pct = (sess / maxSessions * 100).toFixed(0);
+    return `<tr>
+      <td>
+        <div class="page-path" title="${path}">${path}</div>
+        <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td class="td-r">${fmt(sess)}</td>
+      <td class="td-r">${bounce}%</td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadAll() {
+  hideError();
+  setStatus('loading');
+  try {
+    await Promise.all([
+      loadOverview(currentDays),
+      loadTimeseries(currentDays),
+      loadChannels(currentDays),
+      loadPages(currentDays),
+    ]);
+    setStatus('live');
+    document.getElementById('footer').textContent =
+      'Last updated ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    setStatus('error');
+    showError(err.message);
+  }
+}
+
+function setRange(days, btn) {
+  currentDays = days;
+  document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadAll();
+}
+
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "society6-analytics",
+  "version": "1.0.0",
+  "description": "Society6 GA4 Analytics Dashboard",
+  "dependencies": {
+    "google-auth-library": "^9.0.0"
+  }
+}
